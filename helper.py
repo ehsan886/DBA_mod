@@ -281,22 +281,50 @@ class Helper:
     def cos_calc_btn_grads(self, l1, l2):
         return torch.dot(l1, l2)/(torch.linalg.norm(l1)+1e-9)/(torch.linalg.norm(l2)+1e-9)
 
+    # def convert_model_to_param_list(self, model):
+    #     idx=0
+    #     params_to_copy_group=[]
+    #     for name, param in model.items():
+    #         num_params_to_copy = torch.numel(param)
+    #         params_to_copy_group.append(param.reshape([num_params_to_copy]).clone().detach())
+    #         idx+=num_params_to_copy
+
+    #     params=torch.ones([idx])
+    #     idx=0
+    #     for param in params_to_copy_group:    
+    #         for par in param:
+    #             params[idx].copy_(par)
+    #             idx += 1
+
+    #     return params
+
+    def flatten_gradient(self, client_grad):
+        # num_clients = len(client_grads)
+        num_of_layers = len(client_grad)
+        # print(num_of_layers)
+        grad_len = [np.array(client_grad[i].cpu().data.numpy().shape).prod() for i in range(num_of_layers)]
+        # print(grad_len)
+        grad = []
+        for i in range(num_of_layers):
+            grad.append(np.reshape(client_grad[i].cpu().data.numpy(), grad_len[i]))
+        # print(grad)
+        grad = np.hstack(grad)
+        return grad
+
     def convert_model_to_param_list(self, model):
-        idx=0
-        params_to_copy_group=[]
+        grad_len = []
         for name, param in model.items():
-            num_params_to_copy = torch.numel(param)
-            params_to_copy_group.append(param.reshape([num_params_to_copy]).clone().detach())
-            idx+=num_params_to_copy
-
-        params=torch.ones([idx])
-        idx=0
-        for param in params_to_copy_group:    
-            for par in param:
-                params[idx].copy_(par)
-                idx += 1
-
-        return params
+            grad_len.append(np.array(param.cpu().data.numpy().shape).prod())
+            # num_params_to_copy = torch.numel(param)
+            # params_to_copy_group.append(param.reshape([num_params_to_copy]).clone().detach())
+            # idx+=num_params_to_copy
+        grad = []
+        idx = 0
+        for name, param in model.items():
+            grad.append(np.reshape(param.cpu().data.numpy(), grad_len[idx]))
+            idx += 1
+        grad = np.hstack(grad)
+        return grad
 
     def get_validation_score(self, candidate, cluster):
         centroid = np.mean(cluster, axis=0)
@@ -308,8 +336,8 @@ class Helper:
     
     def get_optimal_k_for_clustering(self, grads):
         coses = []
-        # nets = grads
-        nets = [grad.numpy() for grad in grads]
+        nets = grads
+        # nets = [grad.numpy() for grad in grads]
         # nets = [np.array(grad) for grad in grads]
         # for i1, net1 in enumerate(nets):
         #     coses_l=[]
@@ -332,9 +360,9 @@ class Helper:
         return sil.index(max(sil))+2, coses
 
     def cluster_grads(self, grads, clustering_method='Spectral', clustering_params='grads', k=10):
-        nets = [grad.numpy() for grad in grads]
+        # nets = [grad.numpy() for grad in grads]
         # nets = [np.array(grad) for grad in grads]
-        # nets = grads
+        nets = grads
         if clustering_params=='lsrs':
             X = self.lsrs
         elif clustering_params=='grads':
@@ -754,7 +782,8 @@ class Helper:
             # print(f'after update {self.convert_model_to_param_list(target_model.state_dict())}')
 
 
-        norms = [torch.linalg.norm(grad).item() for grad in grads]
+        # norms = [torch.linalg.norm(grad).item() for grad in grads]
+        norms = [np.linalg.norm(grad) for grad in grads]
         norm_median = np.median(norms)
         clipping_weights = [min(norm_median/norm, 1) for norm in norms]
         wv = [w*c for w,c in zip(wv, clipping_weights)]
