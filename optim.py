@@ -39,6 +39,11 @@ def sgd(params: List[Tensor],
         print('ref_params', ref_params, '\n')
         sys.exit()
 
+    # for i, param in enumerate(params):
+    #     print(f'param {i}', param)
+    #     print(f'ref_param {i}', ref_params[i])
+    #     print(f'shape {i}', param.shape, ref_params[i].shape)
+
     if len(ref_grad_params)!=0 and len(params)!=len(ref_grad_params):
         print('params', params, '\n')
         print('ref_params', ref_grad_params, '\n')
@@ -69,21 +74,21 @@ def sgd(params: List[Tensor],
             #diff = param - ref_params[i]
             ### if minimize cosine similarity, ref_params contains the gradient of the reference network weights
             
-            if ref_grad_params is not None:
+            # if ref_grad_params is not None and len(ref_grad_params) != 0:
 
-                dir_sign = torch.sign(ref_params[i]-param)
-                diff -= ref_params[i]-param
-                diff -= ref_grad_params[i]
-                diff = diff.mul_(0.5)
+            dir_sign = torch.sign(ref_params[i]-param)
+            diff = ref_params[i]-param
+                # diff -= ref_grad_params[i]
+            # diff = diff.mul_(0.5)
             
-            #d_p = d_p.mul_(0)
-            d_p = d_p.add(diff, alpha=inertia)
+            d_p = d_p.mul_(0)
+            d_p = d_p.add(diff, alpha=1)
         
         #if diff_total==0:
             #print('diff_total 0')
 
         alpha = lr if maximize else -lr
-        param.add_(d_p, alpha=alpha)
+        param.add_(d_p, alpha=1)
 
 
 
@@ -163,6 +168,7 @@ class SGD(Optimizer):
             param_set.update(set(group['params']))
 
         if not param_set.isdisjoint(set(param_group['params'])):
+            print('param_set', param_set)
             raise ValueError("some parameters appear in more than one parameter group")
 
         #self.ref_param_groups.append(param_group)
@@ -180,7 +186,8 @@ class SGD(Optimizer):
             param_groups = [{'params': param_groups}]
 
         for param_group in param_groups:
-            self.ref_param_groups.append(self.filter_ref_param_group(param_group))
+            # self.ref_param_groups.append(self.filter_ref_param_group(param_group))
+            self.ref_param_groups.append(param_group)
 
     def __setrefgradparams__(self, params):
         self.ref_grad_param_groups = []

@@ -361,8 +361,10 @@ class ImageHelper(Helper):
 
         self.train_data = [(i, train_loader) for i, train_loader in enumerate(train_loaders)]
         self.test_data = torch.load(f'./saved_data/{self.params["type"]}/{self.params["load_data"]}/test_data.pt')
-        self.test_data_poison = torch.load(f'./saved_data/{self.params["type"]}/{self.params["load_data"]}/test_data_poison.pt')
-        self.test_targetlabel_data = torch.load(f'./saved_data/{self.params["type"]}/{self.params["load_data"]}/test_targetlabel_data.pt')
+        # self.test_data_poison = torch.load(f'./saved_data/{self.params["type"]}/{self.params["load_data"]}/test_data_poison.pt')
+        # self.test_targetlabel_data = torch.load(f'./saved_data/{self.params["type"]}/{self.params["load_data"]}/test_targetlabel_data.pt')
+        self.test_dataset = self.test_data.dataset
+        self.test_data_poison, self.test_targetlabel_data = self.poison_test_dataset()
         logger.info(f'Loaded data')
 
     def load_data(self):

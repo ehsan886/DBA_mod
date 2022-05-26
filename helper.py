@@ -964,6 +964,9 @@ class Helper:
         all_cos_sims = cos_sims
         cos_sims = cos_sims[:-1]
         logger.info(f'cos_sims: {cos_sims}')
+        logger.info(f'adversarial cos_sims: {[self.print_util(names[iidx], cos_sims[iidx]) for iidx in range(len(cos_sims)) if names[iidx] in self.adversarial_namelist]}')
+        logger.info(f'benign cos_sims: {[self.print_util(names[iidx], cos_sims[iidx]) for iidx in range(len(cos_sims)) if names[iidx] in self.benign_namelist]}')
+        
 
         # cos_sims = np.maximum(np.array(cos_sims), 0)
         # norm_weights = cos_sims/(np.sum(cos_sims)+1e-9)
@@ -998,6 +1001,10 @@ class Helper:
                 # temp += wv[c]
             temp = temp / sum_trust_scores
             agg_grads.append(temp)
+
+        wv = [wv[c] * clipping_coeffs[c]/sum_trust_scores for c in range(len(wv))]
+        logger.info(f'adversarial wv: {[self.print_util(names[iidx], wv[iidx]) for iidx in range(len(wv)) if names[iidx] in self.adversarial_namelist]}')
+        logger.info(f'benign wv: {[self.print_util(names[iidx], wv[iidx]) for iidx in range(len(wv)) if names[iidx] in self.benign_namelist]}')
 
 
         target_model.train()

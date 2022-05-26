@@ -1,5 +1,5 @@
 ---
-type: fmnist
+type: mnist
 test_batch_size: 64
 lr: 0.1
 poison_lr: 0.05
@@ -13,9 +13,9 @@ internal_poison_epochs: 5
 poisoning_per_batch: 20
 aggr_epoch_interval: 1 # aggregate every round
 # aggregation_methods Allowed values are: [ 'mean', 'geom_median','foolsgold', 'our_aggr', 'afa']
-aggregation_methods: 'fltrust'
+aggregation_methods: 'our_aggr'
 # attack_methods Allowed values are: ['targeted_label_flip', 'dba' ]
-attack_methods: 'dba'
+attack_methods: 'targeted_label_flip'
 geom_median_maxiter: 10
 fg_use_memory: true
 participants_namelist: [0,1,2,3,4,5,6,7,8,9]
@@ -47,13 +47,13 @@ adversary_list: [41, 73, 51, 74]
 tlf_label: 'medium'
 poison_label_swap: 2
 random_adversary_for_label_flip: true
-number_of_adversary_dba: 20
+number_of_adversary_dba: 40
 number_of_adversary_targeted_label_flip: 40
 src_grp_mal: 4
 skip_iteration_in_tlf: false
 adaptive_grad_attack: False
-load_data: 1
-
+load_data: 2
+new_adaptive_attack: True
 
 afa_alpha_0: 3
 afa_beta_0: 3
@@ -122,7 +122,7 @@ log_interval: 2
 poison_momentum: 0.9
 poison_decay: 0.005
 results_json: true
-alpha_loss: 1
+alpha_loss: 0.5
 diff_privacy: false
 sigma: 0.001
 
