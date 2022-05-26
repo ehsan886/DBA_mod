@@ -11,6 +11,8 @@ import config
 from sklearn.metrics.pairwise import cosine_distances
 import numpy as np
 
+from optim import sgd, SGD
+
 def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_name_keys):
 
     def main_logger_info(info):
@@ -49,7 +51,7 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                 if int(agent_name_key) == helper.adversarial_namelist[temp_index]:
                     adversarial_index= temp_index
                     localmodel_poison_epochs = helper.poison_epochs_by_adversary[adversarial_index]
-                    main_logger_info(
+                    main.logger.info(
                         f'poison local model {agent_name_key} index {adversarial_index} ')
                     break
             if len(helper.adversarial_namelist) == 1:
@@ -62,13 +64,44 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                 target_params_variables[name] = last_local_model[name].clone().detach().requires_grad_(False)
 
             if is_poison and agent_name_key in helper.adversarial_namelist and (epoch in localmodel_poison_epochs):
+                if 'new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack']:
+                    ref_model = local_model
+                    ref_model.copy_params(target_model.state_dict())
+                    ref_optimizer = torch.optim.SGD(ref_model.parameters(), lr=helper.params['lr'],
+                                    momentum=helper.params['momentum'],
+                                    weight_decay=helper.params['decay'])
+
+                    _, data_iterator = helper.train_data[agent_name_key]
+                    total_loss = 0.
+                    correct = 0
+                    dataset_size = 0
+                    dis2global_list = []
+                    for batch_id, batch in enumerate(data_iterator):
+
+                        ref_optimizer.zero_grad()
+                        data, targets = helper.get_batch(data_iterator, batch,evaluation=False)
+
+                        dataset_size += len(data)
+                        output = ref_model(data)
+                        loss = nn.functional.cross_entropy(output, targets)
+                        loss.backward()
+
+                        ref_optimizer.step()
+
+
                 main_logger_info('poison_now')
 
                 poison_lr = helper.params['poison_lr']
                 internal_epoch_num = helper.params['internal_poison_epochs']
                 step_lr = helper.params['poison_step_lr']
 
-                poison_optimizer = torch.optim.SGD(model.parameters(), lr=poison_lr,
+                if 'new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack']:
+                    poison_optimizer = SGD(model.parameters(), lr=poison_lr,
+                                                   momentum=helper.params['momentum'],
+                                                   weight_decay=helper.params['decay'], minimizeDist = True)
+                    poison_optimizer.__setrefparams__(ref_model.parameters())
+                else:
+                    poison_optimizer = torch.optim.SGD(model.parameters(), lr=poison_lr,
                                                    momentum=helper.params['momentum'],
                                                    weight_decay=helper.params['decay'])
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(poison_optimizer,
@@ -358,6 +391,7 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                 epochs_local_update_list.append(local_model_update_dict)
         
         helper.local_models[agent_name_key] = model
+        main.logger.info(f'{agent_name_key} model updated.')
         epochs_submit_update_dict[agent_name_key] = epochs_local_update_list
 
     return epochs_submit_update_dict, num_samples_dict
