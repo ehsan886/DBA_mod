@@ -11,8 +11,6 @@ import config
 from sklearn.metrics.pairwise import cosine_distances
 import numpy as np
 
-from optim import sgd, SGD
-
 def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_name_keys):
 
     def main_logger_info(info):
@@ -63,6 +61,25 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                 target_params_variables[name] = last_local_model[name].clone().detach().requires_grad_(False)
 
             if is_poison and agent_name_key in helper.adversarial_namelist and (epoch in localmodel_poison_epochs):
+                if helper.params['attack_methods'] == config.ATTACK_SIA or ('new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack']):
+                    _, data_iterator = helper.train_data[agent_name_key]
+                    balanced_data = []
+                    balanced_data_dict = {}
+                    # count_by_class_dict = {}
+                    for i in range(10):
+                        balanced_data_dict[i] = 0
+                        # count_by_class_dict[i] = 0
+                    # for (x, y) in data_iterator.dataset:
+                    #     count_by_class_dict[y] += 1
+                    # min_samples_in_a_class = min(count_by_class_dict.values())
+                    for (x, y) in data_iterator.dataset:
+                        # if balanced_data_dict[y] < 10 and y != helper.source_class:
+                        if balanced_data_dict[y] < 10:
+                            # if balanced_data_dict[y] < min_samples_in_a_class:
+                            balanced_data_dict[y] += 1
+                            balanced_data.append((x, y))
+                    balanced_data_iterator = torch.utils.data.DataLoader(balanced_data, batch_size=helper.params['batch_size'], shuffle=True)
+
                 if 'new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack']:
                     ref_client_grad = []
                     ref_model = helper.new_model()
@@ -70,20 +87,6 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                     ref_optimizer = torch.optim.SGD(ref_model.parameters(), lr=helper.params['lr'],
                                     momentum=helper.params['momentum'],
                                     weight_decay=helper.params['decay'])
-
-                    _, data_iterator = helper.train_data[agent_name_key]
-
-                    balanced_data = []
-                    balanced_data_dict = {}
-                    for i in range(10):
-                        balanced_data_dict[i] = 0 
-                    for (x, y) in data_iterator.dataset:
-                        # if balanced_data_dict[y] < 10 and y != helper.source_class:
-                        if balanced_data_dict[y] < 10:
-                            balanced_data_dict[y] += 1
-                            balanced_data.append((x, y))
-                    
-                    balanced_data_iterator = torch.utils.data.DataLoader(balanced_data, batch_size=helper.params['batch_size'], shuffle=True)
                     total_loss = 0.
                     correct = 0
                     dataset_size = 0
@@ -119,13 +122,8 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                 internal_epoch_num = helper.params['internal_poison_epochs']
                 step_lr = helper.params['poison_step_lr']
 
-                if 'new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack'] and False:
-                    poison_optimizer = SGD(model.parameters(), lr=poison_lr,
-                                                   momentum=helper.params['momentum'],
-                                                   weight_decay=helper.params['decay'], minimizeDist = True)
-                    poison_optimizer.__setrefparams__(ref_model.parameters())
-                else:
-                    poison_optimizer = torch.optim.SGD(model.parameters(), lr=poison_lr,
+
+                poison_optimizer = torch.optim.SGD(model.parameters(), lr=poison_lr,
                                                    momentum=helper.params['momentum'],
                                                    weight_decay=helper.params['decay'])
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(poison_optimizer,
@@ -141,14 +139,15 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                     correct = 0
                     dataset_size = 0
                     dis2global_list=[]
-                    if 'new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack']:
+                    # if 'new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack']:
+                    if helper.params['attack_methods'] == config.ATTACK_SIA:
                         train_data_iterator = balanced_data_iterator
                     else:
                         train_data_iterator = data_iterator
                     for batch_id, batch in enumerate(train_data_iterator):
                         if helper.params['attack_methods'] == config.ATTACK_DBA:
                             data, targets, poison_num = helper.get_poison_batch(batch, adversarial_index=adversarial_index,evaluation=False)
-                        elif helper.params['attack_methods'] == config.ATTACK_TLF:
+                        elif helper.params['attack_methods'] in [config.ATTACK_TLF, config.ATTACK_SIA]:
                             data, targets, poison_num = helper.get_poison_batch_for_targeted_label_flip(batch)
                         poison_optimizer.zero_grad()
                         dataset_size += len(data)
@@ -158,6 +157,7 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                         class_loss = nn.functional.cross_entropy(output, targets)
 
                         if 'new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack']:
+                            # if helper.params['attack_methods'] == config.ATTACK_SIA or ('new_adaptive_attack' in helper.params.keys() and helper.params['new_adaptive_attack']):
                             if (internal_epoch==1 and batch_id==0):
                                 distance_loss = 0
                                 loss = class_loss
@@ -279,7 +279,7 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                                                                                                 is_poison=True,
                                                                                                 visualize=False,
                                                                                                 agent_name_key=agent_name_key)
-                        elif helper.params['attack_methods'] == config.ATTACK_TLF:
+                        elif helper.params['attack_methods'] in [config.ATTACK_TLF, config.ATTACK_SIA]:
                             epoch_loss, epoch_acc, epoch_corret, epoch_total = test.Mytest_poison_label_flip(helper=helper,
                                                                                                 epoch=epoch,
                                                                                                 model=model,
@@ -407,7 +407,7 @@ def ImageTrain(helper, start_epoch, local_model, target_model, is_poison,agent_n
                                                                                             is_poison=True,
                                                                                             visualize=True,
                                                                                             agent_name_key=agent_name_key)
-                    elif helper.params['attack_methods'] == config.ATTACK_TLF:
+                    elif helper.params['attack_methods'] in [config.ATTACK_TLF, config.ATTACK_SIA]:
                         epoch_loss, epoch_acc, epoch_corret, epoch_total = test.Mytest_poison_label_flip(helper=helper,
                                                                                             epoch=epoch,
                                                                                             model=model,

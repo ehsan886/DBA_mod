@@ -482,7 +482,7 @@ class ImageHelper(Helper):
 
             self.classes_dict = self.build_classes_dict()
             logger.info('build_classes_dict done')
-        if self.params['attack_methods'] == config.ATTACK_TLF:
+        if self.params['attack_methods'] in [config.ATTACK_TLF, config.ATTACK_SIA]:
             target_class_test_data=[]
             for _, (x, y) in enumerate(self.test_data.dataset):
                 if y==self.source_class:
@@ -528,7 +528,7 @@ class ImageHelper(Helper):
         else:
             self.adversarial_namelist = self.params['adversary_list']
         for idx, id in enumerate(self.adversarial_namelist):
-            if self.params['attack_methods'] == config.ATTACK_TLF:
+            if self.params['attack_methods'] in [config.ATTACK_TLF, config.ATTACK_SIA]:
                 if self.params['skip_iteration_in_tlf']:
                     self.poison_epochs_by_adversary[idx] = [2*i+1 for i in range(self.params['epochs']//2)]
                 else:
